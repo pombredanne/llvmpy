@@ -40,20 +40,22 @@ import llvm.ee as ee        # target data
 import llvm.core as core    # module, function etc.
 import llvm._core as _core  # C wrappers
 import llvm._util as _util  # Utility functions
+from llvm._utils import finalizer
 
 #===----------------------------------------------------------------------===
 # Pass manager builder
 #===----------------------------------------------------------------------===
 
-class PassManagerBuilder(object):
+class PassManagerBuilder(finalizer.OwnerMixin):
     @staticmethod
     def new():
         return PassManagerBuilder(_core.LLVMPassManagerBuilderCreate())
 
     def __init__(self, ptr):
         self.ptr = ptr
+        self._finalizer_track(self.ptr)
 
-    def __del__(self):
+    def _finalize(self):
         _core.LLVMPassManagerBuilderDispose(self.ptr)
 
     def populate(self, pm):
@@ -127,7 +129,7 @@ class PassManagerBuilder(object):
 # Pass manager
 #===----------------------------------------------------------------------===
 
-class PassManager(object):
+class PassManager(finalizer.OwnerMixin):
 
     @staticmethod
     def new():
@@ -135,8 +137,9 @@ class PassManager(object):
 
     def __init__(self, ptr):
         self.ptr = ptr
+        self._finalizer_track(self.ptr)
 
-    def __del__(self):
+    def _finalize(self):
         _core.LLVMDisposePassManager(self.ptr)
 
     def add(self, tgt_data_or_pass_name):

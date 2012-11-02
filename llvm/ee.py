@@ -36,6 +36,7 @@ import llvm                 # top-level, for common stuff
 import llvm.core as core    # module, function etc.
 import llvm._core as _core  # C wrappers
 import llvm._util as _util  # utility functions
+from llvm._utils import finalizer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -122,7 +123,7 @@ class TargetData(llvm.Ownable):
 # Generic value
 #===----------------------------------------------------------------------===
 
-class GenericValue(object):
+class GenericValue(finalizer.OwnerMixin):
 
     @staticmethod
     def int(ty, intval):
@@ -166,8 +167,9 @@ class GenericValue(object):
 
     def __init__(self, ptr):
         self.ptr = ptr
+        self._finalizer_track(self.ptr)
 
-    def __del__(self):
+    def _finalize(self):
         _core.LLVMDisposeGenericValue(self.ptr)
 
     def as_int(self):
@@ -194,7 +196,7 @@ def _unpack_generic_values(objlist):
 # Engine builder
 #===----------------------------------------------------------------------===
 
-class EngineBuilder(object):
+class EngineBuilder(finalizer.OwnerMixin):
     @staticmethod
     def new(module):
         core.check_is_module(module)
@@ -205,8 +207,9 @@ class EngineBuilder(object):
     def __init__(self, ptr, module):
         self.ptr = ptr
         self._module = module
+        self._finalizer_track(self.ptr)
 
-    def __del__(self):
+    def _finalize(self):
         _core.LLVMDisposeEngineBuilder(self.ptr)
 
     def force_jit(self):
@@ -249,7 +252,7 @@ class EngineBuilder(object):
 # Execution engine
 #===----------------------------------------------------------------------===
 
-class ExecutionEngine(object):
+class ExecutionEngine(finalizer.OwnerMixin):
 
     @staticmethod
     def new(module, force_interpreter=False):
@@ -263,8 +266,9 @@ class ExecutionEngine(object):
     def __init__(self, ptr, module):
         self.ptr = ptr
         module._own(self)
+        self._finalizer_track(self.ptr)
 
-    def __del__(self):
+    def _finalize(self):
         _core.LLVMDisposeExecutionEngine(self.ptr)
 
     def run_function(self, fn, args):
@@ -323,7 +327,7 @@ def get_host_cpu_name():
     '''
     return _core.LLVMGetHostCPUName()
 
-class TargetMachine(object):
+class TargetMachine(finalizer.OwnerMixin):
 
     @staticmethod
     def lookup(arch, cpu='', features='', opt=2):
@@ -343,8 +347,9 @@ class TargetMachine(object):
 
     def __init__(self, ptr):
         self.ptr = ptr
+        self._finalizer_track(self.ptr)
 
-    def __del__(self):
+    def _finalize(self):
         _core.LLVMDisposeTargetMachine(self.ptr)
 
     def emit_assembly(self, module):

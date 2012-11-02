@@ -38,6 +38,8 @@ import llvm                 # top-level, for common stuff
 import llvm._core as _core  # C wrappers
 import llvm._util as _util  # utility functions
 
+from llvm._utils import finalizer # C-resource finalizer
+
 
 #===----------------------------------------------------------------------===
 # Enumerations
@@ -1796,7 +1798,7 @@ def _make_value(ptr):
 # Builder
 #===----------------------------------------------------------------------===
 
-class Builder(object):
+class Builder(finalizer.OwnerMixin):
 
     @staticmethod
     def new(basic_block):
@@ -1807,8 +1809,9 @@ class Builder(object):
 
     def __init__(self, ptr):
         self.ptr = ptr
+        self._finalizer_track(self.ptr)
 
-    def __del__(self):
+    def _finalize(self):
         _core.LLVMDisposeBuilder(self.ptr)
 
     def position_at_beginning(self, bblk):
@@ -2298,7 +2301,7 @@ class Builder(object):
 # Memory buffer
 #===----------------------------------------------------------------------===
 
-class MemoryBuffer(object):
+class MemoryBuffer(finalizer.OwnerMixin):
 
     @staticmethod
     def from_file(fname):
@@ -2320,8 +2323,9 @@ class MemoryBuffer(object):
 
     def __init__(self, ptr):
         self.ptr = ptr
+        self._finalizer_track(self.ptr)
 
-    def __del__(self):
+    def _finalize(self):
         _core.LLVMDisposeMemoryBuffer(self.ptr)
 
 
