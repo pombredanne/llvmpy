@@ -1,6 +1,5 @@
-#! /usr/bin/env python
 # ______________________________________________________________________
-
+from __future__ import absolute_import
 import sys
 import os.path
 import imp
@@ -10,13 +9,12 @@ import types
 import llvm.core as lc
 import llvm.ee as le
 
-import bytetype
-import byte_translator
-from pyaddfunc import pyaddfunc
+from . import bytetype, byte_translator
+from .pyaddfunc import pyaddfunc
 
 LLVM_TO_INT_PARSE_STR_MAP = {
     8 : 'b',
-    16 : 'h', 
+    16 : 'h',
     32 : 'i', # Note that on 32-bit systems sizeof(int) == sizeof(long)
     64 : 'L', # Seeing sizeof(long long) == 8 on both 32 and 64-bit platforms
 }

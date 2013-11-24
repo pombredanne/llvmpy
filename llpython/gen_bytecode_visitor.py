@@ -1,7 +1,6 @@
-#! /usr/bin/env python
 # ______________________________________________________________________
-
-import opcode_util
+from __future__ import absolute_import
+from . import opcode_util
 
 # ______________________________________________________________________
 

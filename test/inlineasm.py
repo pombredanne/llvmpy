@@ -3,12 +3,13 @@
 # Import the llvm-py modules.
 from llvm import *
 from llvm.core import *
+from llvm.test_llvmpy import TestCase
 
 import logging
 import unittest
 
 
-class TestInlineAsm(unittest.TestCase):
+class TestInlineAsm(TestCase):
     def test_inline_asm(self):
         mod = Module.new(__name__)
         fnty = Type.function(Type.int(), [Type.int()])
@@ -19,7 +20,7 @@ class TestInlineAsm(unittest.TestCase):
         inlineasm = InlineAsm.get(iaty,  "bswap $0", "=r,r")
         self.assertIn('asm "bswap $0", "=r,r"', str(inlineasm))
         builder.ret(builder.call(inlineasm, [fn.args[0]]))
-        print fn
+        print(fn)
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,10 +1,9 @@
-#! /usr/bin/env python
 # ______________________________________________________________________
-
+from __future__ import absolute_import
 import itertools
 
 import opcode
-from opcode_util import itercode
+from .opcode_util import itercode
 
 # ______________________________________________________________________
 
@@ -160,6 +159,32 @@ class BytecodeIterVisitor (BytecodeVisitor):
         pass
 
     def exit_code_object (self, co_obj):
+        pass
+
+# ______________________________________________________________________
+
+class BasicBlockVisitor (BytecodeVisitor):
+    def visit (self, blocks):
+        self.enter_blocks(blocks)
+        block_indices = list(blocks.keys())
+        block_indices.sort()
+        for block_index in block_indices:
+            self.enter_block(block_index)
+            for i, op, arg in blocks[block_index]:
+                self.visit_op(i, op, arg)
+            self.exit_block(block_index)
+        return self.exit_blocks(blocks)
+
+    def enter_blocks (self, blocks):
+        pass
+
+    def exit_blocks (self, blocks):
+        pass
+
+    def enter_block (self, block_index):
+        pass
+
+    def exit_block (self, block_index):
         pass
 
 # ______________________________________________________________________

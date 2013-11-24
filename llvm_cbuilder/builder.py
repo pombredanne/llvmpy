@@ -14,7 +14,9 @@ from . import shortnames as types
 ###
 
 class FunctionAlreadyExists(NameError):
-    pass
+
+    def __init__(self, func):
+        self.func = func
 
 def _is_int(ty):
     return isinstance(ty, lc.IntegerType)
@@ -494,6 +496,7 @@ class CBuilder(object):
                 # new constant string
                 globalstr = mod.add_global_variable(content.type, name=name)
                 globalstr.initializer = content
+                globalstr.linkage = lc.LINKAGE_LINKONCE_ODR
                 globalstr.global_constant = True
             else:
                 # compare existing content
@@ -784,7 +787,7 @@ class CDefinition(object):
         cls._name_ = "%s_%d" % (cls._name_, counter)
         cls.counter = counter + 1
 
-    def define(self, module):
+    def define(self, module, optimize=True):
         '''define the function in the module.
 
         Raises NameError if a function of the same name has already been
@@ -814,13 +817,13 @@ class CDefinition(object):
         self.cbuilder.close()
         self.cbuilder = None
 
-        # optimize
-        fpm = lp.FunctionPassManager.new(module)
-        pmb = lp.PassManagerBuilder.new()
-        pmb.opt_level = 3
-        pmb.vectorize = True
-        pmb.populate(fpm)
-        fpm.run(func)
+        if optimize:
+            fpm = lp.FunctionPassManager.new(module)
+            pmb = lp.PassManagerBuilder.new()
+            pmb.opt_level = 2
+            pmb.populate(fpm)
+            fpm.run(func)
+
         return func
 
     def __call__(self, module):
@@ -829,7 +832,7 @@ class CDefinition(object):
         try:
             func = self.define(module)
         except FunctionAlreadyExists as e:
-            (func,) = e
+            func = e.func
         return func
 
     def __getattr__(self, attr):
@@ -987,28 +990,31 @@ class IntegerValue(OperatorMixin):
         else:
             return self._temp(self.parent.builder.sdiv(self.value, rhs.value))
 
+    __truediv__ = __div__
+    __floordiv__ = __div__
+
     def __mod__(self, rhs):
         if self.unsigned:
             return self._temp(self.parent.builder.urem(self.value, rhs.value))
         else:
             return self._temp(self.parent.builder.srem(self.value, rhs.value))
 
-    def __ilshift__(self, rhs):
+    def __lshift__(self, rhs):
         return self._temp(self.parent.builder.shl(self.value, rhs.value))
 
-    def __irshift__(self, rhs):
+    def __rshift__(self, rhs):
         if self.unsigned:
             return self._temp(self.self.parent.builder.lshr(self.value, rhs.value))
         else:
             return self._temp(self.parent.builder.ashr(self.value, rhs.value))
 
-    def __iand__(self, rhs):
+    def __and__(self, rhs):
         return self._temp(self.parent.builder.and_(self.value, rhs.value))
 
-    def __ior__(self, rhs):
+    def __or__(self, rhs):
         return self._temp(self.parent.builder.or_(self.value, rhs.value))
 
-    def __ixor__(self, rhs):
+    def __xor__(self, rhs):
         return self._temp(self.parent.builder.xor(self.value, rhs.value))
 
     def __lt__(self, rhs):
@@ -1081,6 +1087,8 @@ class RealValue(OperatorMixin):
     def __div__(self, rhs):
         return self._temp(self.parent.builder.fdiv(self.value, rhs.value))
 
+    __truediv__ = __div__
+
     def __mod__(self, rhs):
         return self._temp(self.parent.builder.frem(self.value, rhs.value))
 
@@ -1133,11 +1141,11 @@ class PointerIndexing(OperatorMixin):
             # Case #1: A[idx:] get pointer offset by idx
             if not idx.step and not idx.stop:
                 idx = _auto_coerce_index(self.parent, idx.start)
-                ptr = bldr.gep(self.value, [idx.value])
+                ptr = bldr.gep(self.value, [idx.value], inbounds=True)
                 return CArray(self.parent, ptr)
         else: # return an variable at idx
             idx = _auto_coerce_index(self.parent, idx)
-            ptr = bldr.gep(self.value, [idx.value])
+            ptr = bldr.gep(self.value, [idx.value], inbounds=True)
             return CVar(self.parent, ptr)
 
     def __setitem__(self, idx, val):
@@ -1152,6 +1160,10 @@ class PointerCasting(OperatorMixin):
 
         if _is_pointer(ty):
             return self._temp(self.parent.builder.bitcast(self.value, ty))
+
+        if _is_int(ty):
+            return self._temp(self.parent.builder.ptrtoint(self.value, ty))
+
         raise CastError(self.type, ty)
 
 
@@ -1182,7 +1194,7 @@ class PointerValue(PointerIndexing, PointerCasting):
         inst = self.parent.builder.store(val.value, self.value, **kws)
         if nontemporal:
             self.parent.set_memop_non_temporal(inst)
-
+        return inst
 
     def atomic_load(self, ordering, align=None, crossthread=True):
         '''atomic load memory for pointer types

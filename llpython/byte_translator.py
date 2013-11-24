@@ -1,22 +1,21 @@
-#! /usr/bin/env python
 # ______________________________________________________________________
 '''Defines a bytecode based LLVM translator for llpython code.
 '''
 # ______________________________________________________________________
 # Module imports
-
+from __future__ import absolute_import
 import opcode
 import types
 import logging
 
 import llvm.core as lc
 
-import opcode_util
-import bytetype
-from bytecode_visitor import BytecodeFlowVisitor
-from byte_flow import BytecodeFlowBuilder
-from byte_control import ControlFlowBuilder
-from phi_injector import PhiInjector, synthetic_opname
+from . import opcode_util
+from . import bytetype
+from .bytecode_visitor import BytecodeFlowVisitor
+from .byte_flow import BytecodeFlowBuilder
+from .byte_control import ControlFlowBuilder
+from .phi_injector import PhiInjector, synthetic_opname
 
 # ______________________________________________________________________
 # Module data
@@ -153,7 +152,7 @@ class LLVMTranslator (BytecodeFlowVisitor):
         environment.'''
         if llvm_type is None:
             if llvm_function is None:
-                llvm_type = lc.Type.function(lvoid, ())
+                llvm_type = lc.Type.function(bytetype.lvoid, ())
             else:
                 llvm_type = llvm_function.type.pointee
         if env is None:
@@ -178,7 +177,8 @@ class LLVMTranslator (BytecodeFlowVisitor):
         self.globals = func_globals
         nargs = self.code_obj.co_argcount
         self.cfg = self.control_flow_builder.visit(
-            self.bytecode_flow_builder.visit(self.code_obj), nargs)
+            opcode_util.build_basic_blocks(self.code_obj), nargs)
+        self.cfg.blocks = self.bytecode_flow_builder.visit_cfg(self.cfg)
         self.llvm_function = llvm_function
         flow = self.phi_injector.visit_cfg(self.cfg, nargs)
         ret_val = self.visit(flow)
@@ -224,6 +224,12 @@ class LLVMTranslator (BytecodeFlowVisitor):
         return ret_val
 
     def exit_block (self, block):
+        bb_instrs = self.llvm_block.instructions
+        if ((len(bb_instrs) == 0) or
+                (not bb_instrs[-1].is_terminator)):
+            out_blocks = list(self.cfg.blocks_out[block])
+            assert len(out_blocks) == 1
+            self.builder.branch(self.llvm_blocks[out_blocks[0]])
         del self.llvm_block
         del self.builder
 
@@ -449,7 +455,11 @@ class LLVMTranslator (BytecodeFlowVisitor):
         return [self.builder.branch(self.llvm_blocks[i + arg + 3])]
 
     def op_JUMP_IF_FALSE (self, i, op, arg, *args, **kws):
-        raise NotImplementedError("LLVMTranslator.op_JUMP_IF_FALSE")
+        cond = args[0]
+        block_false = self.llvm_blocks[i + 3 + arg]
+        block_true = self.llvm_blocks[i + 3]
+        return [self.builder.cbranch(cond, block_true, block_false)]
+        # raise NotImplementedError("LLVMTranslator.op_JUMP_IF_FALSE")
 
     def op_JUMP_IF_FALSE_OR_POP (self, i, op, arg, *args, **kws):
         raise NotImplementedError("LLVMTranslator.op_JUMP_IF_FALSE_OR_POP")

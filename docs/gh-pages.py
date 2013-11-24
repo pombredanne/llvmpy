@@ -30,7 +30,7 @@ from subprocess import Popen, PIPE, CalledProcessError, check_call
 pages_dir = 'gh-pages'
 html_dir = '_build/html'
 pdf_dir = '_build/latex'
-pages_repo = 'git@github.com:llvmpy/llvmpy-doc.git'
+pages_repo = 'https://github.com/llvmpy/llvmpy-doc.git'
 
 #-----------------------------------------------------------------------------
 # Functions
@@ -86,7 +86,7 @@ if __name__ == '__main__':
             tag = sh2('git describe --exact-match')
         except CalledProcessError:
             tag = "dev"   # Fallback
-    
+
     startdir = os.getcwdu()
     if not os.path.exists(pages_dir):
         # init the repo
